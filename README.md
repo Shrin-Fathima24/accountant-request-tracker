@@ -2,27 +2,40 @@
 
 ## Overview
 
-A full-stack application for recording accountant work requests, tracking status, and surfacing overdue work. Requests and reminders are stored in MongoDB.
+A simple full-stack application for creating and tracking accountant work requests, updating their status, and identifying overdue work.
+
+Requests and in-app reminders are stored in MongoDB.
 
 ## Features
 
-- Create and view requests with required-field validation
+- Create requests with title, client name, assignee, due date, and status
+- View all requests sorted by due date
 - Update request status
-- Sort requests by due date
-- Detect overdue requests and calculate days overdue
-- Generate in-app reminders automatically
+- Detect overdue open requests and calculate days overdue
+- Automatically generate in-app reminders for overdue requests
+- Prevent duplicate reminders for the same request on the same day
 
 ## Tech Stack
 
-React, Vite, plain CSS, JavaScript, Node.js, Express, MongoDB, Mongoose, node-cron, dotenv, and cors.
+- React
+- Vite
+- JavaScript
+- Plain CSS
+- Node.js
+- Express
+- MongoDB
+- Mongoose
+- node-cron
+- dotenv
+- cors
 
 ## Project Structure
 
-- `client/src`: React interface and centralized API service
-- `server/models`: Mongoose request and reminder models
-- `server/controllers` and `server/routes`: request and reminder API
-- `server/services`: shared overdue calculation
-- `server/jobs`: scheduled reminder generation
+- `client/src` — React interface and centralized API service
+- `server/models` — Mongoose request and reminder models
+- `server/controllers` and `server/routes` — API controllers and routes
+- `server/services` — shared overdue calculation logic
+- `server/jobs` — scheduled reminder generation
 
 ## Prerequisites
 
@@ -31,16 +44,23 @@ React, Vite, plain CSS, JavaScript, Node.js, Express, MongoDB, Mongoose, node-cr
 
 ## Installation
 
-```sh
+Install the server dependencies:
+
+```bash
 cd server
 npm install
+```
+
+Install the client dependencies:
+
+```bash
 cd ../client
 npm install
 ```
 
 ## Environment Setup
 
-Copy `server/.env.example` to `server/.env` and set the connection string:
+Copy `server/.env.example` to `server/.env` and configure the database connection:
 
 ```env
 PORT=5000
@@ -48,56 +68,128 @@ MONGODB_URI=mongodb://localhost:27017/accountant_tracker
 CLIENT_ORIGIN=http://localhost:5173
 ```
 
-For Atlas, replace `MONGODB_URI` with your database URI. Keep `.env` private; it is ignored by Git.
+For MongoDB Atlas, replace `MONGODB_URI` with your Atlas connection URI.
 
-## Running
+Keep `.env` private. It is ignored by Git and should not be committed.
 
-Start MongoDB first. In one terminal:
+## Running the Application
 
-```sh
+Start MongoDB first.
+
+In one terminal:
+
+```bash
 cd server
 npm run dev
 ```
 
 In another terminal:
 
-```sh
+```bash
 cd client
 npm run dev
 ```
 
-Open the Vite URL (usually `http://localhost:5173`). The frontend uses `http://localhost:5000/api` by default; set `VITE_API_BASE_URL` in a client `.env` file to change it.
+Open the Vite URL shown in the terminal, usually:
+
+```text
+http://localhost:5173
+```
+
+The frontend uses:
+
+```text
+http://localhost:5000/api
+```
+
+as the default API URL.
+
+To change the API URL, set `VITE_API_BASE_URL` in the client environment configuration.
 
 ## API Endpoints
 
 - `POST /api/requests` — create a request
-- `GET /api/requests` — list requests by due date ascending
-- `PATCH /api/requests/:id/status` — update status
-- `GET /api/requests/overdue` — list active overdue requests and `daysOverdue`
-- `GET /api/reminders` — list reminders, newest first
+- `GET /api/requests` — list requests sorted by due date ascending
+- `PATCH /api/requests/:id/status` — update request status
+- `GET /api/requests/overdue` — list active overdue requests with `daysOverdue`
+- `GET /api/reminders` — list generated reminders, newest first
 - `GET /api/health` — basic server health check
 
-Successful list responses use `{ success, count, data }`; errors use `{ success: false, message }`.
+Successful list responses use:
 
-## Automation
+```json
+{
+  "success": true,
+  "count": 0,
+  "data": []
+}
+```
 
-The node-cron job runs every minute. It uses the shared overdue service and creates one in-app reminder per overdue request per UTC calendar day. A unique MongoDB index on request and day prevents duplicates even if jobs overlap. Completed requests are excluded.
+Errors use:
+
+```json
+{
+  "success": false,
+  "message": "Error message"
+}
+```
+
+## Overdue Automation
+
+The application uses `node-cron` to run a scheduled job every minute.
+
+The job:
+
+1. Checks for open requests whose due date has passed.
+2. Uses the shared overdue calculation service.
+3. Creates an in-app reminder for each overdue request.
+4. Prevents duplicate reminders for the same request on the same UTC calendar day.
+5. Excludes completed requests.
+
+A unique MongoDB index on the request and reminder date provides additional protection against duplicate reminders.
+
+The prototype generates **in-app reminders only**; it does not send external emails or notifications.
 
 ## What Works
 
-Request creation, listing, status changes, due-date sorting, overdue detection, days-overdue calculation, scheduled in-app reminders, and a UI for viewing requests, overdue items, and reminders. Requests and reminders are stored in MongoDB.
+The prototype supports:
+
+- Request creation
+- Request listing
+- Status updates
+- Due-date sorting
+- Overdue detection
+- Days-overdue calculation
+- Scheduled in-app reminders
+- Viewing overdue requests and reminders
+- MongoDB persistence
+
+No real client data is included.
 
 ## Future Improvements
 
-Authentication and roles, email notifications, search and filtering, pagination, audit history, production deployment, and a richer notification system.
+With more time, I would consider adding:
+
+- Authentication and user roles
+- Email notifications
+- Search and filtering
+- Pagination
+- Audit history
+- More automated tests
+- Production deployment
+- A richer notification system
 
 ## Walkthrough Outline
 
 1. Create a future-dated Open request and show it in the sorted list.
-2. Change its status to In Progress, then Completed; point out the summary counts.
-3. Create an Open request due yesterday and show it in Overdue Requests.
-4. Wait for the next minute-based cron run, then show its in-app reminder (or refresh after the run).
-5. Mark the overdue request Completed and show it leave the overdue list.
-6. Open `GET /api/requests/overdue` and explain calendar-day comparison, sorting, and `daysOverdue`.
+2. Update its status to In Progress and then Completed.
+3. Create an Open request with a past due date and show it in Overdue Requests.
+4. Wait for the scheduled job to run and show the generated in-app reminder.
+5. Mark the overdue request as Completed and show that it is removed from the overdue list.
+6. Open `GET /api/requests/overdue` and explain the overdue calculation, sorting, and `daysOverdue` logic.
 
-The prototype has no authentication or outbound notifications. The scheduled job starts after MongoDB connects, and reminders are deduplicated by UTC date.
+## Notes
+
+This is a prototype focused on the requested functionality rather than production features.
+
+The scheduled reminder job starts after MongoDB connects. Reminders are stored in MongoDB and deduplicated by request and UTC calendar day.
